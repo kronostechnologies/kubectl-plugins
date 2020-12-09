@@ -27,6 +27,10 @@ while [ -h "$SOURCE" ]; do
 done
 DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)";
 
+command_exists () {
+    type "$1" &> /dev/null;
+}
+
 listValidContexts () {
     CTXs=" $(kubectl --request-timeout=2 config view -o jsonpath='{.contexts[*].name}') ";
     echo "${CTXs//$CTX_POST_FIX/}";
@@ -42,6 +46,15 @@ listValidNamespaces () {
     echo $namespaces
 }
 
+useDefaultContext () {
+    if command_exists kubectx; then
+        currentContext=$(kubectx -c)
+    else
+        currentContext=$(kubectl config current-context)
+    fi
+    useContext "${currentContext//$CTX_POST_FIX/}";
+}
+
 useContext () {
     validContexts=$(listValidContexts);
     if [[ "$validContexts" == *" $1 "* ]]; then
@@ -50,6 +63,16 @@ useContext () {
     else
       echo "Invalid context (environment): $1. Must be in$validContexts";
       exit 1;
+    fi
+}
+
+useDefaultNamespace () {
+    if command_exists kubens; then
+        useNamespace $(kubens -c);
+    else
+        currentNamespace="$(kubectl config view --minify | grep namespace:)"
+        namespacePrefix="    namespace: "
+        useNamespace "${currentNamespace//$namespacePrefix/}";
     fi
 }
 
@@ -147,14 +170,13 @@ POD=$1
 if [[ $context ]]; then
     useContext $context;
 else
-    currentContext=$(kubectx -c)
-    useContext "${currentContext//$CTX_POST_FIX/}";
+    useDefaultContext;
 fi
 
 if [[ $namespace ]]; then
     useNamespace $namespace;
 else
-    useNamespace $(kubens -c);
+    useDefaultNamespace;
 fi
 
 if [[ $getList ]]; then

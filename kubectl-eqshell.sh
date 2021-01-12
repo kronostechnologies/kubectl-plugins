@@ -8,13 +8,15 @@ printUsage () {
     echo -e "
 This script opens a shell on a Kubernetes pod:
 
-        kubectl eqshell [<pod>] [-c <context>] [-n <namespace>] [OPTIONS]
+        kubectl eqshell [<pod>] [OPTIONS]
 
-<context> must be in $(listValidContexts)
-<namespace> must be in $(listValidNamespaces)
+<pod> Connect to specific pod
+
 OPTIONS
-        -l Lists running pod names for namespace.
-        -i Specifies pod to connect to by index." 1>&2;
+        -c <context> Use specific context, must be in $(listValidContexts)
+        -n <namespace> Use specific namespace, must be in $(listValidNamespaces)
+        -i <index> Specifies pod to connect to by index
+        -l Lists running pod names for namespace." 1>&2;
     exit 1;
 }
 

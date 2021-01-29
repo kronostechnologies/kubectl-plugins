@@ -12,6 +12,7 @@ Fire, make sure your scripts are installed by running `kubectl plugin list` in y
 |---------|------------------------------------------------------|-----------------------------------------------------------------------------------------|
 | eqshell | Open a shell on a Kubernetes pod                     | kubectl eqshell                                                                         |
 | eqcp    | Copy a given file to/from a specified Kubernetes pod | kubectl eqcp ~/Downloads/hello.txt equisoft-connect-worker-456146:/srv/shared/hello.txt |
+| eqtool  | Run specified app tool on a Kubernetes pod           | kubectl eqtool                                                                          |
 
 ## Contribution
 Do not hesitate to contribute by adding your own scripts. Everyone can benefit from it.

@@ -13,8 +13,9 @@ This script opens a shell on a Kubernetes pod:
 <pod> Connect to specific pod
 
 OPTIONS
-        -c <context> Use specific context, must be in $(listValidContexts)
-        -n <namespace> Use specific namespace, must be in $(listValidNamespaces)
+        -c <context> Use specific context
+        -n <namespace> Use specific namespace
+        -o <container> Use specific container
         -i <index> Specifies pod to connect to by index
         -l Lists running pod names for namespace." 1>&2;
     exit 1;
@@ -44,8 +45,20 @@ listValidNamespaces () {
     do
         name="${line%% *}"
         namespaces="$namespaces $name"
-    done < <(kubectl --request-timeout=2 get namespaces --no-headers)
+    done < <(kubectl --request-timeout=2 --context $CONTEXT get namespaces --no-headers)
     echo $namespaces
+}
+
+listAllPods () {
+    kubectl --request-timeout=2 --context $CONTEXT -n $NAMESPACE get pods  --field-selector=status.phase=Running -o=name | sed -e 's/pod\///' | grep -v "memcached" | grep -v "frontend" | grep -v "cron";
+}
+
+listPods () {
+    if [[ "$NAMESPACE" == "equisoft-connect" || "$NAMESPACE" == "equisoft-plan" ]]; then
+        listAllPods | grep "worker";
+    else
+        listAllPods;
+    fi
 }
 
 useDefaultContext () {
@@ -63,7 +76,7 @@ useContext () {
       PRETTY_CONTEXT="$1";
       CONTEXT="$1$CTX_POST_FIX";
     else
-      echo "Invalid context (environment): $1. Must be in$validContexts";
+      printf '\e[31m%b\e[0m\n' "Invalid context (environment): $1. Must be in$validContexts";
       exit 1;
     fi
 }
@@ -83,28 +96,16 @@ useNamespace () {
     if [[ "$validNamespaces" == *" $1 "* ]]; then
       NAMESPACE="$1"
     else
-      echo "Invalid namespace (app): $1. Must be in$validNamespaces";
+      printf '\e[31m%b\e[0m\n' "Invalid namespace (app): $1. Must be in$validNamespaces";
       exit 1;
     fi
 }
 
-listAllPods () {
-    kubectl --request-timeout=2 --context $CONTEXT -n $NAMESPACE get pods  --field-selector=status.phase=Running -o=name | sed -e 's/pod\///' | grep -v "memcached" | grep -v "frontend" | grep -v "cron";
-}
-
-listPods () {
-    if [[ "$NAMESPACE" == "equisoft-connect" || "$NAMESPACE" == "equisoft-plan" ]]; then
-        listAllPods | grep "worker";
-    else
-        listAllPods;
-    fi
-}
-
-usePodSulSide () {
+useDefaultPod () {
     IFS=' ';
     read -r -a pod_names <<< $(listPods);
     if [[ -z ${pod_names[0]} ]]; then
-        echo "No pod found for namespace $NAMESPACE";
+        printf '\e[31m%b\e[0m\n' "No pod found for namespace $NAMESPACE";
         exit 1;
     else
         POD="${pod_names[0]}";
@@ -116,26 +117,42 @@ usePodByIndex () {
     IFS=' ';
     read -r -a pod_names <<< $(listPods | xargs);
     if [[ -z ${pod_names[$INDEX]} ]]; then
-        echo "Pod index not found for namespace $NAMESPACE";
+        printf '\e[31m%b\e[0m\n' "Pod index not found for namespace $NAMESPACE";
         exit 1;
     else
         POD="${pod_names[$INDEX]}";
     fi
 }
 
+useDefaultContainer () {
+    validContainers=($(kubectl --request-timeout=2 --context $CONTEXT get pods -n $NAMESPACE $POD -o jsonpath='{.spec.containers[*].name}'));
+    if [[ "${#validContainers[@]}" -ne "1" ]]; then
+        CONTAINER="$NAMESPACE";
+    fi
+}
+
+useContainer () {
+    validContainers=($(kubectl --request-timeout=2 --context $CONTEXT get pods -n $NAMESPACE $POD -o jsonpath='{.spec.containers[*].name}'));
+    if [[ "$validContainers" == *"$1"* ]]; then
+        CONTAINER="$1"
+    else
+        printf '\e[33m%b\e[0m\n' "Invalid container: $1. Must be in $validContainers";
+        exit 1;
+    fi
+}
+
 printSpecifyPodWarning () {
-    echo "Please specify a pod to connect to (Protip: list them with '-a' option).";
+    printf '\e[33m%b\e[0m\n' "Please specify a pod to connect to (Protip: list them with '-a' option).";
     exit 1;
 }
 
 connect () {
-    availableContainers=($(kubectl --request-timeout=2 --context $CONTEXT get pods -n $NAMESPACE $POD -o jsonpath='{.spec.containers[*].name}'));
     command="kubectl --request-timeout=2 --context $CONTEXT -n $NAMESPACE exec -it $POD";
-    if [[ "${#availableContainers[@]}" -eq "1" ]]; then
-        echo "Connecting in $PRETTY_CONTEXT environment on \"$NAMESPACE:$POD\" in its default container!";
+    if [[ $CONTAINER ]]; then
+        printf '\e[36m%b\e[0m\n' "Connecting in $PRETTY_CONTEXT environment on \"$NAMESPACE:$POD\" in its container \"$CONTAINER\"!";
+        command+=" -c $CONTAINER";
     else
-        echo "Connecting in $PRETTY_CONTEXT environment on \"$NAMESPACE:$POD\" in its container \"$NAMESPACE\"!";
-        command+=" -c $NAMESPACE";
+        printf '\e[36m%b\e[0m\n' "Connecting in $PRETTY_CONTEXT environment on \"$NAMESPACE:$POD\" in its default container!";
     fi
     envContextPrefix="! grep -q 'kboi PS1' /root/.bashrc && echo -ne '\n# kboi PS1\nexport PS1=\\\"[$env] \\\$PS1\\\"' >> /root/.bashrc; /bin/bash";
     command+=" -- /bin/bash -c \"$envContextPrefix\"";
@@ -143,7 +160,7 @@ connect () {
 }
 
 OPTIND=1;
-while getopts "lhc:n:p:i:" option; do
+while getopts "lhc:n:p:o:i:" option; do
     case "${option}" in
         l)
             getList=true;
@@ -153,6 +170,9 @@ while getopts "lhc:n:p:i:" option; do
             ;;
         n)
             namespace=${OPTARG};
+            ;;
+        o)
+            container=${OPTARG};
             ;;
         i)
             podIndex=${OPTARG};
@@ -184,12 +204,20 @@ fi
 if [[ $getList ]]; then
     listPods
     exit 0;
-elif [[ $POD ]]; then
+fi
+
+if [[ $POD ]]; then
     true;
 elif [[ $podIndex ]]; then
     usePodByIndex $podIndex
 else
-    usePodSulSide
+    useDefaultPod
+fi
+
+if [[ $container ]]; then
+    useContainer $container;
+else
+    useDefaultContainer;
 fi
 
 connect;

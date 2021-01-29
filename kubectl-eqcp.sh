@@ -63,7 +63,7 @@ useDefaultNamespace () {
     if command_exists kubens; then
         useNamespace $(kubens -c);
     else
-        currentNamespace="$(kubectl config view --minify | grep namespace:)"
+        currentNamespace="$(kubectl config view --context $CONTEXT --minify | grep namespace:)"
         namespacePrefix="    namespace: "
         useNamespace "${currentNamespace//$namespacePrefix/}";
     fi

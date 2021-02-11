@@ -2,8 +2,7 @@
 
 set -e;
 
-KUBECTL_PATH="$(which kubectl)";
-KUBECTL_DIR="${KUBECTL_PATH%kubectl}"
+KUBECTL_DIR="$(realpath ~/bin)"
 
 FILES=~/kronos/kubectl-plugins/kubectl-*.sh
 for LOCAL_FILEPATH in $FILES

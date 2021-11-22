@@ -16,7 +16,10 @@ OPTIONS
         -p <pod> Use specific pod
         -c <context> Use specific context
         -n <namespace> Use specific namespace
-        -o <container> Specify a container." 1>&2;
+        -o <container> Specify a container
+
+<context> must be in prod|ca-accp|dsf-prod|dsf-accp|ia-prod|ia-accp|us-prod|us-accp|unstable
+<namespace> must be in account-service|admail|antivirus|argo-events|auth-server|backup|calculatrices|cert-manager|chartmuseum|circleci-exporter|cpanel|cpanel2|datagateways|default|environment-chooser|equisoft-connect|equisoft-plan|equisoft-plan-express|flux-system|gatekeeper-system|gearmand|getmail|github-exporter|importpdftool|investor-profile|kube-node-lease|kube-public|kube-system|logdna|login|mediawiki|monitoring|pdf-api|premium-calculator|purecloud|rabbitmq|redirector|scan|voice|zpush" 1>&2;
     exit 1;
 }
 

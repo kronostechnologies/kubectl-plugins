@@ -157,7 +157,7 @@ connect () {
     else
         printf '\e[36m%b\e[0m\n' "Connecting in $PRETTY_CONTEXT environment on \"$NAMESPACE:$POD\" in its default container!";
     fi
-    envContextPrefix="! grep -q 'kboi PS1' /root/.bashrc && echo -ne '\n# kboi PS1\nexport PS1=\\\"[$env] \\\$PS1\\\"' >> /root/.bashrc; /bin/bash";
+    envContextPrefix="! grep -q 'kboi PS1' /root/.bashrc && echo -ne '\n# kboi PS1\nexport PS1=\\\"[$PRETTY_CONTEXT] \\\$PS1\\\"' >> /root/.bashrc; /bin/bash";
     command+=" -- /bin/bash -c \"$envContextPrefix\"";
     eval $command;
 }

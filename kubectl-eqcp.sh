@@ -2,7 +2,7 @@
 
 set -e;
 
-readonly CTX_POST_FIX=".k8s.equisoft.io"
+readonly CTX_PREFIX="teleport.ca.equisoft.io-"
 
 printUsage () {
     echo -e "
@@ -20,7 +20,7 @@ OPTIONS
         -n <namespace> Use specific namespace
         -o <container> Use a specific container
 
-<context> must be in prod|ca-accp|dsf-prod|dsf-accp|ia-prod|ia-accp|us-prod|us-accp|unstable
+<context> must be in ca-prod|ca-accp|dsf-prod|dsf-accp|ia-prod|ia-accp|us-prod|us-accp|staging
 <namespace> must be in account-service|admail|antivirus|argo-events|auth-server|backup|calculatrices|cert-manager|chartmuseum|circleci-exporter|cpanel|cpanel2|datagateways|default|environment-chooser|equisoft-connect|equisoft-plan|equisoft-plan-express|flux-system|gatekeeper-system|gearmand|getmail|github-exporter|importpdftool|investor-profile|kube-node-lease|kube-public|kube-system|logdna|login|mediawiki|monitoring|pdf-api|premium-calculator|purecloud|rabbitmq|redirector|scan|voice|zpush
 
 EXAMPLES
@@ -48,7 +48,7 @@ listPods () {
 
 listValidContexts () {
     CTXs=" $(kubectl --request-timeout=2 config view -o jsonpath='{.contexts[*].name}') ";
-    echo "${CTXs//$CTX_POST_FIX/}";
+    echo "${CTXs//$CTX_PREFIX/}";
 }
 
 listValidNamespaces () {
@@ -61,22 +61,27 @@ listValidNamespaces () {
     echo $namespaces
 }
 
+getCurrentContext() {
+  if command_exists kubectx; then
+      currentContext=$(kubectx -c)
+  else
+      currentContext=$(kubectl config current-context)
+  fi
+  echo $currentContext
+}
+
 useDefaultContext () {
-    if command_exists kubectx; then
-        currentContext=$(kubectx -c)
-    else
-        currentContext=$(kubectl config current-context)
-    fi
-    useContext "${currentContext//$CTX_POST_FIX/}";
+    currentContext=$(getCurrentContext)
+    useContext "${currentContext//$CTX_PREFIX/}";
 }
 
 useContext () {
     validContexts=$(listValidContexts);
     if [[ "$validContexts" == *" $1 "* ]]; then
       PRETTY_CONTEXT="$1";
-      CONTEXT="$1$CTX_POST_FIX";
+      CONTEXT="$CTX_PREFIX$1";
     else
-      printf '\e[31m%b\e[0m\n' "Invalid context (environment): $1. Must be in$validContexts";
+      printf '\e[31m%b\e[0m\n' "Invalid context (environment): $1. Must be in $validContexts";
       exit 1;
     fi
 }

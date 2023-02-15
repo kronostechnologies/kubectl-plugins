@@ -66,6 +66,10 @@ listValidNamespaces () {
     echo $namespaces
 }
 
+listValidContainers () {
+    echo " $(kubectl --request-timeout=2 --context $CONTEXT get pods -n $NAMESPACE $POD -o jsonpath='{.spec.containers[*].name}') ";
+}
+
 getCurrentContext() {
   if command_exists kubectx; then
       currentContext=$(kubectx -c)
@@ -118,15 +122,8 @@ useNamespace () {
     fi
 }
 
-useDefaultContainer () {
-    validContainers=($(kubectl --request-timeout=2 --context $CONTEXT get pods -n $NAMESPACE $POD -o jsonpath='{.spec.containers[*].name}'));
-    if [[ "${#validContainers[@]}" -ne "1" ]]; then
-        CONTAINER="$NAMESPACE";
-    fi
-}
-
 useContainer () {
-    validContainers=($(kubectl --request-timeout=2 --context $CONTEXT get pods -n $NAMESPACE $POD -o jsonpath='{.spec.containers[*].name}'));
+    validContainers=$(listValidContainers);
     if [[ "$validContainers" == *"$1"* ]]; then
         CONTAINER="$1"
     else
@@ -147,15 +144,21 @@ useDefaultPod () {
 }
 
 usePod () {
-    FULL_PATH=$1
+    FULL_PATH="$1"
     POD=${FULL_PATH%:*}
     PATH_TO_FILE=${FULL_PATH#*:}
     validContexts=$(listValidContexts);
     if [[ "$validContexts" == *" $POD "* ]]; then
         POD=$(useDefaultPod)
-        echo "$POD:$PATH_TO_FILE"
+        path="$POD:$PATH_TO_FILE"
     else
-        echo "$FULL_PATH"
+        path="$FULL_PATH"
+    fi
+
+    if [[ "destination" == "$2" ]]; then
+      DESTINATION="$path"
+    else
+      SOURCE="$path"
     fi
 }
 
@@ -163,7 +166,7 @@ cp () {
     command="kubectl cp --context $CONTEXT -n $NAMESPACE $SOURCE $DESTINATION";
     if [[ $CONTAINER ]]; then
         printf '\e[36m%b\e[0m\n' "Copy file: $SOURCE to $DESTINATION. (Using container \"$CONTAINER\")";
-        command+="-c $CONTAINER";
+        command="${command} -c $CONTAINER";
     else
         printf '\e[36m%b\e[0m\n' "Copy file: $SOURCE to $DESTINATION. (Using default container)";
     fi
@@ -210,15 +213,13 @@ else
 fi
 
 if [[ $SOURCE == *":"* ]]; then
-    SOURCE=$(usePod "$SOURCE")
+    usePod "$SOURCE" "source"
 else
-    DESTINATION=$(usePod "$DESTINATION")
+    usePod "$DESTINATION" "destination"
 fi
 
 if [[ $container ]]; then
     useContainer "$container";
-else
-    useDefaultContainer;
 fi
 
 cp

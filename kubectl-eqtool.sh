@@ -48,6 +48,10 @@ listValidNamespaces () {
     echo $namespaces
 }
 
+listValidContainers () {
+    echo " $(kubectl --request-timeout=2 --context $CONTEXT get pods -n $NAMESPACE $POD -o jsonpath='{.spec.containers[*].name}') ";
+}
+
 listValidPods () {
     kubectl --request-timeout=2 --context $CONTEXT -n $NAMESPACE get pods --field-selector=status.phase=Running -o=name | sed -e 's/pod\///' | grep -v "memcached" | grep -v "frontend" | grep -v "cron";
 }
@@ -135,7 +139,7 @@ useDefaultContainer () {
 }
 
 useContainer () {
-    validContainers=($(kubectl --request-timeout=2 --context $CONTEXT get pods -n $NAMESPACE $POD -o jsonpath='{.spec.containers[*].name}'));
+    validContainers=$(listValidContainers);
     if [[ "$validContainers" == *"$1"* ]]; then
         CONTAINER="$1"
     else
@@ -150,7 +154,7 @@ tool () {
     command="kubectl --request-timeout=2 --context $CONTEXT -n $NAMESPACE exec -it $POD"
     if [[ $CONTAINER ]]; then
         printf '\e[36m%b\e[0m\n' "Running tool in $PRETTY_CONTEXT environment on \"$NAMESPACE:$POD\" in its container \"$CONTAINER\""
-        command+=" -c $CONTAINER"
+        command="${command} -c $CONTAINER";
     else
         printf '\e[36m%b\e[0m\n' "Running tool in $PRETTY_CONTEXT environment on \"$NAMESPACE:$POD\" in its default container"
     fi

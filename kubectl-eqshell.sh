@@ -2,7 +2,8 @@
 
 set -e;
 
-readonly CTX_PREFIX="teleport.ca.equisoft.io-"
+readonly STAGING_CTX_PREFIX="teleport.staging.equisoft.io-"
+readonly PROD_CTX_PREFIX="teleport.ca.equisoft.io-"
 
 printUsage () {
     echo -e "
@@ -38,8 +39,12 @@ command_exists () {
 }
 
 listValidContexts () {
-    CTXs=" $(kubectl --request-timeout=2 config view -o jsonpath='{.contexts[*].name}') ";
-    echo "${CTXs//$CTX_PREFIX/}";
+    echo " $(kubectl --request-timeout=2 config view -o jsonpath='{.contexts[*].name}') ";
+}
+
+formatValidContexts () {
+    validContexts=$(listValidContexts);
+    echo "$validContexts" | sed -e "s/$STAGING_CTX_PREFIX/staging/g" | sed -e "s/$PROD_CTX_PREFIX//g";
 }
 
 listValidNamespaces () {
@@ -50,6 +55,10 @@ listValidNamespaces () {
         namespaces="$namespaces $name"
     done < <(kubectl --request-timeout=2 --context $CONTEXT get namespaces --no-headers)
     echo $namespaces
+}
+
+listValidContainers () {
+    echo " $(kubectl --request-timeout=2 --context $CONTEXT get pods -n $NAMESPACE $POD -o jsonpath='{.spec.containers[*].name}') ";
 }
 
 listAllPods () {
@@ -70,21 +79,28 @@ getCurrentContext() {
   else
       currentContext=$(kubectl config current-context)
   fi
-  echo $currentContext
+  echo "$currentContext"
 }
 
 useDefaultContext () {
     currentContext=$(getCurrentContext)
-    useContext "${currentContext//$CTX_PREFIX/}";
+    contextPrefix="$PROD_CTX_PREFIX"
+    if [[ "$currentContext" == *"$STAGING_CTX_PREFIX"* ]]; then
+      contextPrefix="$STAGING_CTX_PREFIX"
+    fi
+    useContext "${currentContext//$contextPrefix/}";
 }
 
 useContext () {
     validContexts=$(listValidContexts);
-    if [[ "$validContexts" == *" $1 "* ]]; then
-      PRETTY_CONTEXT="$1";
-      CONTEXT="$CTX_PREFIX$1";
+    PRETTY_CONTEXT="$1";
+    if [[ "staging" == "$PRETTY_CONTEXT" ]]; then
+      CONTEXT="$STAGING_CTX_PREFIX$PRETTY_CONTEXT";
+    elif [[ "$validContexts" == *" $PROD_CTX_PREFIX$PRETTY_CONTEXT "* ]]; then
+      CONTEXT="$PROD_CTX_PREFIX$PRETTY_CONTEXT";
     else
-      printf '\e[31m%b\e[0m\n' "Invalid context (environment): $1. Must be in $validContexts";
+      formattedValidContexts=$(formatValidContexts);
+      printf '\e[31m%b\e[0m\n' "Invalid context (environment): $1. Must be in $formattedValidContexts";
       exit 1;
     fi
 }
@@ -140,7 +156,7 @@ useDefaultContainer () {
 }
 
 useContainer () {
-    validContainers=($(kubectl --request-timeout=2 --context $CONTEXT get pods -n $NAMESPACE $POD -o jsonpath='{.spec.containers[*].name}'));
+    validContainers=$(listValidContainers);
     if [[ "$validContainers" == *"$1"* ]]; then
         CONTAINER="$1"
     else
@@ -158,7 +174,7 @@ connect () {
     command="kubectl --request-timeout=2 --context $CONTEXT -n $NAMESPACE exec -it $POD";
     if [[ $CONTAINER ]]; then
         printf '\e[36m%b\e[0m\n' "Connecting in $PRETTY_CONTEXT environment on \"$NAMESPACE:$POD\" in its container \"$CONTAINER\"!";
-        command+=" -c $CONTAINER";
+        command="${command} -c $CONTAINER";
     else
         printf '\e[36m%b\e[0m\n' "Connecting in $PRETTY_CONTEXT environment on \"$NAMESPACE:$POD\" in its default container!";
     fi
@@ -198,13 +214,13 @@ shift $((OPTIND-1));
 POD=$1
 
 if [[ $context ]]; then
-    useContext $context;
+    useContext "$context";
 else
     useDefaultContext;
 fi
 
 if [[ $namespace ]]; then
-    useNamespace $namespace;
+    useNamespace "$namespace";
 else
     useDefaultNamespace;
 fi
@@ -217,13 +233,13 @@ fi
 if [[ $POD ]]; then
     true;
 elif [[ $podIndex ]]; then
-    usePodByIndex $podIndex
+    usePodByIndex "$podIndex"
 else
     useDefaultPod
 fi
 
 if [[ $container ]]; then
-    useContainer $container;
+    useContainer "$container";
 else
     useDefaultContainer;
 fi

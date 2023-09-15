@@ -2,8 +2,7 @@
 
 set -e;
 
-readonly STAGING_CTX_PREFIX="teleport.staging.equisoft.io-"
-readonly PROD_CTX_PREFIX="teleport.ca.equisoft.io-"
+readonly CTX_PREFIX="teleport.ca.equisoft.io-"
 
 printUsage () {
     echo -e "
@@ -35,7 +34,7 @@ listValidContexts () {
 
 formatValidContexts () {
     validContexts=$(listValidContexts);
-    echo "$validContexts" | sed -e "s/$STAGING_CTX_PREFIX/staging/g" | sed -e "s/$PROD_CTX_PREFIX//g";
+    echo "$validContexts" | sed -e "s/$CTX_PREFIX//g";
 }
 
 listValidNamespaces () {
@@ -45,7 +44,7 @@ listValidNamespaces () {
         name="${line%% *}"
         namespaces="$namespaces $name"
     done < <(kubectl --request-timeout=2 --context $CONTEXT get namespaces --no-headers)
-    echo $namespaces
+    echo "$namespaces"
 }
 
 listValidContainers () {
@@ -75,20 +74,15 @@ getCurrentContext() {
 
 useDefaultContext () {
     currentContext=$(getCurrentContext)
-    contextPrefix="$PROD_CTX_PREFIX"
-    if [[ "$currentContext" == *"$STAGING_CTX_PREFIX"* ]]; then
-      contextPrefix="$STAGING_CTX_PREFIX"
-    fi
+    contextPrefix="$CTX_PREFIX"
     useContext "${currentContext//$contextPrefix/}";
 }
 
 useContext () {
     validContexts=$(listValidContexts);
     PRETTY_CONTEXT="$1";
-    if [[ "staging" == "$PRETTY_CONTEXT" ]]; then
-      CONTEXT="$STAGING_CTX_PREFIX$PRETTY_CONTEXT";
-    elif [[ "$validContexts" == *" $PROD_CTX_PREFIX$PRETTY_CONTEXT "* ]]; then
-      CONTEXT="$PROD_CTX_PREFIX$PRETTY_CONTEXT";
+    if [[ "$validContexts" == *" $CTX_PREFIX$PRETTY_CONTEXT "* ]]; then
+      CONTEXT="$CTX_PREFIX$PRETTY_CONTEXT";
     else
       formattedValidContexts=$(formatValidContexts);
       printf '\e[31m%b\e[0m\n' "Invalid context (environment): $1. Must be in $formattedValidContexts";

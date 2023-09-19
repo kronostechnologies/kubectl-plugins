@@ -1,5 +1,6 @@
-# Kubectl Plugins
+# [DEPRECATED] Kubectl Plugins
 This repo contains many useful scripts to help you dealing with tasks around Kubernetes.
+It is now considered deprecated and the repo is archived since in favor of other tools such as [K8S Lens](https://k8slens.dev/).
 
 ## Install
 [Equisoft bootcamp](https://github.com/kronostechnologies/bootcamp/tree/master/k8s) has a script that installs all the plugins listed below.
